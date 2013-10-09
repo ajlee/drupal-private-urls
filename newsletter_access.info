@@ -1,0 +1,6 @@
+name = Newsletter Access
+description = Restricts access to newsletter and private news content
+package = FoEE
+version = 0.1
+core = 7.x
+files[] = newsletter_access.module

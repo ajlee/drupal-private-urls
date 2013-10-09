@@ -1,0 +1,175 @@
+<?php
+ 
+ /**
+ * Implements hook_menu_alter
+ */
+function newsletter_access_menu_alter(&$items){
+  $items['node/%node']['access callback'] = 'newsletter_access_check_node_access';
+}
+
+/**
+ * Custom menu access callback for node/%node
+ */
+function newsletter_access_check_node_access($op, $node){
+ 
+  // Note $op and $node are passed in default node_menu access arguments
+  if ($op == 'view' && isset($node->nid)) {
+  	if ($node->type=="newsletter" || $node->type=="members_only_news")
+	{
+	    // Allow access to anon if request_uri contains specific hash
+	    if (!user_is_logged_in()) {
+	      $hash = md5(drupal_get_private_key() . $node->nid);
+	      // request_uri includes alias
+	      $request = explode('/', request_uri());
+	      if (in_array($hash, $request)) {
+	        return TRUE;
+	      } else {
+	        return FALSE;
+	      }
+	    }
+	}
+  }
+  // Fallback to allow regular node_access checks
+  return node_access($op, $node);
+}
+
+
+function newsletter_access_token_info() {
+  $types['foee'] = array(
+    'name' => t("FoEE Tokens New"),
+    'description' => t("Tokens for FoEE."),
+  );
+  
+  $tokens['md5'] = array(
+    'name' => t("Unique MD5 Hash"),
+    'description' => t("The md5 hash unique for each node."),
+  );
+  
+  return array(
+    'types' => $types,
+    'tokens' => array(
+      'foee' => $tokens,
+    ),
+  );
+  
+}
+  
+function newsletter_access_tokens($type, $tokens, array $data = array(), array $options = array()) {
+  
+  $replacements = array();
+  
+  if ($type == 'foee') {
+    foreach ($tokens as $name => $original) {
+      switch ($name) {
+        case 'md5':
+          $replacements[$original] =  md5(drupal_get_private_key() . $data['node']->nid);
+        break;
+      }
+    }
+  }
+  
+  return $replacements;
+}
+
+function newsletter_access_perm() {
+    return array('access testFoo', 'administer testFoo');
+}
+
+function newsletter_access_menu() {
+    $items['admin/config/development/newsletter_access'] = array(
+        'title' => 'TestFoo Config',
+        'description' => 'Settings and Configuration for the Newsletter Access module',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('newsletter_access_admin'),
+        'access arguments' => array('administer  newsletter_access'),
+        'type' => MENU_NORMAL_ITEM
+    );
+    $items['newsletter_access'] = array(
+        'title' => variable_get(' newsletter_access_pageTitle', 'My Page'),
+        'page callback' => 'get_newsletter_access_page_contents',
+        'access arguments' => array('access newsletter_access'),
+        'type' => MENU_NORMAL_ITEM
+    );
+    return $items;
+}
+
+function newsletter_access_admin() {
+    $form['newsletter_access_pageTitle'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Page Title'),
+        '#default_value' => variable_get('newsletter_access_pageTitle', 'My Page'),
+        '#size' => 60,
+        '#maxlength' => 256,
+        '#description' => t('The title for the testFoo page'),
+        '#weight' => 0,
+    );
+
+    $options = node_type_get_names();
+    $form['newsletter_access_node_types'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Users may export these content types'),
+        '#options' => $options,
+        '#default_value' => variable_get('newsletter_access_node_types', array()),
+        '#description' => t('Nodes of these types will provide links for exporting to html'),
+        '#weight' => 1,
+    );
+
+    return system_settings_form($form);
+}
+
+function get_newsletter_access_page_contents() {
+    return t('<p>Some test of the foo</p>');
+}
+
+function newsletter_access_help($path, $arg) {
+    switch ($path) {
+        // Help for another path in the block module
+        case 'admin/config/development/newsletter_access':
+            return '<p>' . t('Configure how <a href="@jquery">jQuery</a> behaves on the site. Select which jQuery version, the compression level and whether or not to use a CDN.', array(
+                '@jquery' => 'http://jquery.com',
+            )) . '</p>';
+    }
+}
+
+function newsletter_access_form_alter(&$form, &$form_state, $form_id) {
+
+    //print_r($form);
+
+    $form['#after_build'][] = 'newsletter_access_form_alter_after_build';
+
+    //is it a node edit form?
+    if (strpos($form_id, '_node_form') !== FALSE) {
+
+        //is it a new node? check if the node idon the form exists in the database yet
+        if(!isset($form['nid']['#value'])) {
+            // add simple checkbox to the field set
+            $form['contact']['approve'] = array(
+                '#type' =>'checkbox',
+                '#title' => t('Contact me'),
+            );
+        }
+    }
+
+    return $form;
+}
+
+function newsletter_access_form_alter_after_build ($form, &$form_state) {
+    //watchdog("newsletter access", "in after build");
+    foreach ($form as $key => $thing)
+    {
+        if ($key == 'path')
+        {
+            echo '<pre>';
+            echo var_dump($form['path']['alias']);
+            echo '</pre>';
+        }
+
+    }
+
+    if (empty($form['path']['alias']['#default_value']))
+    {
+        $form['path']['alias']['#default_value'] = 'xyzfilter';
+    }
+
+    return ($form);
+}
