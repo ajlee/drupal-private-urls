@@ -1,0 +1,101 @@
+<?php
+
+ /**
+ * Implements hook_menu_alter
+ */
+function private_node_urls_menu_alter(&$items){
+  $items['node/%node']['access callback'] = 'private_node_urls_check_node_access';
+}
+
+/**
+ * Custom menu access callback for node/%node
+ */
+function private_node_urls_check_node_access($op, $node){
+  //what node types have been set as private?
+  $private_node_types = variable_get('private_node_urls_node_types', array());
+
+  //access settings will only apply to 1) nodes and 2) during the view action
+  if ($op == 'view' && isset($node->nid)) {
+
+    //is the node of a content type that has been set to have private URLs?
+  	if ($private_node_types[$node->type]===$node->type)
+	{
+	    //Is the user prevented access to the node through the normal URL?
+	    if (!user_access('access private nodes via normal URL')) {
+
+          //get rid of trailing and leading slashes
+          $clean_request_uri = rtrim(request_uri(),"/");
+          $clean_request_uri = ltrim($clean_request_uri,"/");
+          $clean_path_alias = rtrim(drupal_get_path_alias(),"/");
+          $clean_path_alias = ltrim($clean_path_alias,"/");
+
+          //is the user accessing the node through the secret URL?
+	      if ($clean_path_alias === $clean_request_uri) {
+	        return TRUE; //Yes - show content
+	      } else {
+	        return FALSE; //No - access denied
+	      }
+	    }
+	}
+  }
+
+  // Fallback to allow regular node_access checks
+  return node_access($op, $node);
+}
+
+function private_node_urls_permission() {
+    return array(
+        'access private nodes via normal URL' => array(
+            'title' => t('Can access private nodes via the normal URL'),
+        ),
+    );
+}
+
+function private_node_urls_menu() {
+    $items['admin/config/content/private_node_urls'] = array(
+        'title' => 'Private Node URL Settings',
+        'description' => 'Settings and Configuration for the Private Node URL module',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('private_node_urls_admin'),
+        'access arguments' => array('administer private node URL settings'),
+        'type' => MENU_NORMAL_ITEM
+    );
+    return $items;
+}
+
+function private_node_urls_admin() {
+
+    user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID,array('access private nodes via normal URL'));
+    $options = node_type_get_names();
+    $form['private_node_urls_node_types'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Make the following content types visible only through the alias'),
+        '#options' => $options,
+        '#default_value' => variable_get('private_node_urls_node_types', array()),
+        '#description' => t('Disable public access to nodes of these types through their node path e.g. /node/1 and ' .
+                            'allows access only if the node alias is used.'),
+        '#weight' => 1,
+    );
+
+    return system_settings_form($form);
+}
+
+function private_node_urls_help($path, $arg) {
+
+    switch ($path) {
+        // Help for another path in the block module
+        case 'admin/help#private_node_urls':
+            return '<p>' . t('Use this module to disable access to nodes through the "normal" URL such as node/123, ' .
+                    'so access is only though the URL alias which the node content creator sets. ' .
+                    'In combination with the "pathauto" module you can use this module to give nodes secret URLs ' .
+                    'that are only known to selected users that you share the URL with, by giving content types ' .
+                    'a default path pattern such as [random:hash:md5].</p>' .
+                    '<p>Note that you also have to make sure your views do not list the node content, if the content ' .
+                    'is linked to from your pages a secret URL won\' be much use!</p>' .
+                    '<p><em>This module only does enables private URLs for chosen content types, not individual nodes. ' .
+                    'You could use this module by creating a content type such as "private blog post" and selecting ' .
+                    'this as a private content type in this module\'s settings page. If this module interests people ' .
+                    'and people want extra features, such as per node private URLs, please let me know by asking on the ' .
+                    'module forum or emailing me at alex.james.lee at gmail.com.</em></p>');
+    }
+}

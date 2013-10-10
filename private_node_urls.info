@@ -1,0 +1,8 @@
+name = Private Node URLs
+description = Requires anonymous users to access nodes via their alias instead of their normal URL (e.g. node/123)
+package = Access control
+version = 0.2
+core = 7.x
+files[] = private_node_urls.module
+recommends[] = pathauto
+configure = admin/config/content/private_node_urls

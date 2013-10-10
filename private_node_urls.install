@@ -1,0 +1,10 @@
+<?php
+
+function private_node_urls_install() {
+    variable_set('private_node_urls_node_types', 'Private Node URLs Node Types');
+    user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID,array('access private nodes via normal URL'));
+}
+
+function private_node_urls_uninstall() {
+    variable_del('private_node_urls_node_types');
+}
